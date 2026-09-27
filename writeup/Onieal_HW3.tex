@@ -38,6 +38,8 @@ Claude (Anthropic, model \texttt{claude-opus-5-5}) was used to produce the writt
 \end{quote}
 \noindent\rule{0.6\textwidth}{0.4pt}
 
+\textbf{Notation.} Throughout, $\ell$ is the loss on one training example, $\mathcal{L}$ is the loss being minimized (one example's or a batch's), and $L$ is the number of layers.
+
 %======================================================================
 \section{Concepts, intuitions and big picture}
 
@@ -50,11 +52,11 @@ z_j &= \mathbf{0}^\top\mathbf{x} + 0 = 0 \quad\text{for every } j, \qquad a_j = 
 \end{align*}
 Backpropagation gives, for unit $j$,
 \begin{align*}
-\delta_j = \frac{\partial L}{\partial z_j} = \Big(\sum_k W^{[2]}_{kj}\,\delta^{[2]}_k\Big)\, g'(z_j),
+\delta_j = \frac{\partial \mathcal{L}}{\partial z_j} = \Big(\sum_k W^{[2]}_{kj}\,\delta^{[2]}_k\Big)\, g'(z_j),
 \qquad
-\frac{\partial L}{\partial \mathbf{w}_j} = \delta_j\,\mathbf{x}^\top,
+\frac{\partial \mathcal{L}}{\partial \mathbf{w}_j} = \delta_j\,\mathbf{x}^\top,
 \qquad
-\frac{\partial L}{\partial W^{[2]}_{kj}} = \delta^{[2]}_k\, a_j .
+\frac{\partial \mathcal{L}}{\partial W^{[2]}_{kj}} = \delta^{[2]}_k\, a_j .
 \end{align*}
 Column $j$ of $W^{[2]}$ is the same for every $j$ (all zeros) and $z_j$ is the same for every $j$, so $\delta_j$ is the same for every $j$. Every row $\mathbf{w}_j$ therefore receives the same update. Every column of $W^{[2]}$ also receives the same update, because $a_j$ is the same for every $j$. By induction on the step number, if the rows of $W^{[1]}$ and the columns of $W^{[2]}$ are identical before a step, they are identical after it. (For zero initialization in particular, $W^{[2]}=0$ makes $\delta_j = 0$ on the first step, so the first layer does not move at all.)
 
@@ -91,7 +93,7 @@ Suppose every weight in a layer equals the same constant $c$ (and the biases sha
 \[
 z_j = c\sum_k x_k + \beta \quad\text{for all } j \;\Longrightarrow\; a_j = g(z_j) \text{ is the same for all } j.
 \]
-The backward pass gives $\partial L/\partial W_{jk} = \delta_j x_k$ with $\delta_j = \big(\sum_m W^{\text{next}}_{mj}\delta^{\text{next}}_m\big)\,g'(z_j)$. The outgoing weights $W^{\text{next}}_{:,j}$ are also constant, so $\delta_j$ is the same for every $j$ and every unit gets the same update. The units start identical and, by the same induction as 1.1, stay identical for the whole run. A layer of $n$ units then has the capacity of a single unit, and the network wastes almost all of its parameters. This is the symmetry problem, and random initialization is what breaks it. The numerical check for the XOR network in 4.4 shows it: after 20{,}000 gradient descent steps from a constant initialization, the two hidden units still had identical weights. A constant of $c = 0$ is the worst case, because it also zeroes the gradient reaching earlier layers (4.3). A large constant has a second problem, saturation, covered next.
+The backward pass gives $\partial \mathcal{L}/\partial W_{jk} = \delta_j x_k$ with $\delta_j = \big(\sum_m W^{\text{next}}_{mj}\delta^{\text{next}}_m\big)\,g'(z_j)$. The outgoing weights $W^{\text{next}}_{:,j}$ are also constant, so $\delta_j$ is the same for every $j$ and every unit gets the same update. The units start identical and, by the same induction as 1.1, stay identical for the whole run. A layer of $n$ units then has the capacity of a single unit, and the network wastes almost all of its parameters. This is the symmetry problem, and random initialization is what breaks it. The numerical check for the XOR network in 4.4 shows it: after 20{,}000 gradient descent steps from a constant initialization, the two hidden units still had identical weights. A constant of $c = 0$ is the worst case, because it also zeroes the gradient reaching earlier layers (4.3). A large constant has a second problem, saturation, covered next.
 
 \subsection*{1.7 All-sigmoid network initialized with large positive weights}
 \textbf{Answer: No, it is a bad idea.} With large positive weights, pre-activations $z = W\mathbf{a} + \mathbf{b}$ are large. Every sigmoid output is positive, so after the first layer all inputs to a unit are positive and all its weights are positive, and every term in $z_j = \sum_k W_{jk}a_k$ adds in the same direction. The units saturate at $\sigma(z)\approx 1$, where the slope vanishes:
@@ -214,12 +216,13 @@ Figure~\ref{fig:act} plots each function (solid) and its derivative (dashed). Th
 
 \subsection*{3.3 The vanishing gradient problem}
 \textbf{What it is.} Backpropagation multiplies one Jacobian per layer, so the gradient that reaches layer $l$ is the product
-\[
+\begin{gather*}
 \frac{\partial \mathcal{L}}{\partial \mathbf{h}^{[l]}} = \frac{\partial \mathcal{L}}{\partial \mathbf{h}^{[L]}}\,J^{[L]}J^{[L-1]}\cdots J^{[l+1]},
 \qquad
-J^{[i]} = \frac{\partial\mathbf{h}^{[i]}}{\partial\mathbf{z}^{[i]}}\,\frac{\partial\mathbf{z}^{[i]}}{\partial\mathbf{h}^{[i-1]}} = \diag\big(g'(\mathbf{z}^{[i]})\big)\,W^{[i]},
-\]
-where $\mathbf{h}^{[i]} = g(\mathbf{z}^{[i]})$ and $\mathbf{z}^{[i]} = W^{[i]}\mathbf{h}^{[i-1]}+\mathbf{b}^{[i]}$. When these factors have norm below 1, the product shrinks exponentially with depth and the early layers barely learn. RNNs have the same problem over time, because the same recurrent weight matrix enters the product once per time step.
+J^{[i]} = \frac{\partial\mathbf{h}^{[i]}}{\partial\mathbf{z}^{[i]}}\,\frac{\partial\mathbf{z}^{[i]}}{\partial\mathbf{h}^{[i-1]}} = \diag\big(g'(\mathbf{z}^{[i]})\big)\,W^{[i]}\\
+\text{for } \mathbf{h}^{[i]} = g(\mathbf{z}^{[i]}),\quad \mathbf{z}^{[i]} = W^{[i]}\mathbf{h}^{[i-1]}+\mathbf{b}^{[i]}.
+\end{gather*}
+When these factors have norm below 1, the product shrinks exponentially with depth and the early layers barely learn. RNNs have the same problem over time, because the same recurrent weight matrix enters the product once per time step.
 
 \textbf{Which activations and why.} Sigmoid and tanh, because they saturate: $\sigma'(x)\le 1/4$ and $\tanh'(x)\le 1$, and both go to $0$ as $|x|$ grows (3.2). Ten sigmoid layers therefore scale the gradient by at most $(1/4)^{10}\approx 9.5\times 10^{-7}$, before the weights are even counted. ReLU's derivative is $1$ for every positive input, so it does not shrink the gradient through active units (inactive units pass back zero, which is the separate ``dying ReLU'' problem).
 
@@ -251,7 +254,7 @@ The first term is $\sigma(\mathbf{z})_i$ when $i=j$ and $0$ otherwise, which is 
 \[
 \mathbf{J}_\sigma(\mathbf{z}) = \diag\big(\sigma(\mathbf{z})\big) - \sigma(\mathbf{z})\,\sigma(\mathbf{z})^\top\in\R^{K\times K}. \qquad\blacksquare
 \]
-Two checks. The matrix is symmetric. Each row sums to zero, $\sum_j[\mathbf{J}]_{ij} = \sigma_i - \sigma_i\sum_j\sigma_j = 0$, which it must, because adding the same constant to every $z_j$ leaves softmax unchanged. A consequence used in every classifier in this course: for cross-entropy $\mathcal{L} = -\sum_i y_i\log\sigma_i$ with one-hot $\mathbf{y}$, $\partial\mathcal{L}/\partial z_j = -\sum_i \frac{y_i}{\sigma_i}\sigma_i(\delta_{ij}-\sigma_j) = -y_j + \sigma_j\sum_i y_i = \sigma_j - y_j$.
+Two checks. The matrix is symmetric. Each row sums to zero, $\sum_j[\mathbf{J}]_{ij} = \sigma_i - \sigma_i\sum_j\sigma_j = 0$, which it must, because adding the same constant to every $z_j$ leaves softmax unchanged. A consequence used in every classifier in this course: for cross-entropy $\ell = -\sum_i y_i\log\sigma_i$ with one-hot $\mathbf{y}$, $\partial\ell/\partial z_j = -\sum_i \frac{y_i}{\sigma_i}\sigma_i(\delta_{ij}-\sigma_j) = -y_j + \sigma_j\sum_i y_i = \sigma_j - y_j$.
 
 %======================================================================
 \section{Simulating XOR}
