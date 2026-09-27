@@ -1,0 +1,52 @@
+== Section 2 Jacobians (shape, matches closed form) ==
+c         autograd shape (4,)     match=True
+||w||^2   autograd shape (4,)     match=True
+w^T x_i   autograd shape (4,)     match=True
+Xw        autograd shape (3, 4)   match=True
+w         autograd shape (4, 4)   match=True
+w^2       autograd shape (4, 4)   match=True
+XW^T      autograd shape (3, 2, 2, 4) match delta_bp X_aq: True
+flattened Jacobian == kron(X, I_k): True
+
+== Section 3 softmax ==
+diag(s)-ss^T match: True
+elementwise s_i(delta_ij - s_j) match: True
+rows of J sum to 0: True
+max sigmoid' = 0.25 at x = -2.0816681711721685e-16
+max tanh' = 1.0
+sigmoid'(10) = 4.5395807735907655e-05
+sigmoid'(5) = 0.006648056670790033
+
+== Section 5 computation graph ==
+h1,h2,h3,f = 0.0 20.085536923187668 40.171073846375336 40.171073846375336
+df/dx, df/dy, df/dz = 1.0 40.171073846375336 20.085536923187668
+e^3 = 20.085536923187668  2e^3 = 40.171073846375336
+
+dvec_r(XW^T)/dvec_c(W) == kron(X, I_k): True
+4.2 z1: [[0.0, -1.0], [1.0, 0.0], [1.0, 0.0], [2.0, 1.0]]  h: [[0.0, 0.0], [1.0, 0.0], [1.0, 0.0], [2.0, 1.0]]  yhat: [0.0, 1.0, 1.0, 0.0]
+
+4.3 zero init, ReLU, MSE, full-batch GD, 5000 steps
+ W1 [[0.0, 0.0], [0.0, 0.0]]  b1 [0.0, 0.0]  W2 [0.0, 0.0]  b2 0.5
+ yhat [0.5, 0.5, 0.5, 0.5]  loss 0.25
+
+4.4 constant init, several activations
+ sigmoid c=  0.5: hidden units identical=True input cols equal=True yhat=[0.021, 0.655, 0.655, 0.67] loss=1.719e-01
+ sigmoid c= -0.3: hidden units identical=True input cols equal=True yhat=[0.026, 0.651, 0.651, 0.672] loss=1.737e-01
+ sigmoid c=  1.0: hidden units identical=True input cols equal=True yhat=[0.018, 0.657, 0.657, 0.67] loss=1.712e-01
+ tanh    c=  0.5: hidden units identical=True input cols equal=True yhat=[0.004, 0.664, 0.664, 0.668] loss=1.677e-01
+ tanh    c= -0.3: hidden units identical=True input cols equal=True yhat=[0.004, 0.664, 0.664, 0.668] loss=1.677e-01
+ tanh    c=  1.0: hidden units identical=True input cols equal=True yhat=[0.004, 0.665, 0.665, 0.667] loss=1.677e-01
+ relu    c=  0.5: hidden units identical=True input cols equal=True yhat=[0.5, 0.5, 0.5, 0.5] loss=2.500e-01
+ relu    c= -0.3: hidden units identical=True input cols equal=True yhat=[0.5, 0.5, 0.5, 0.5] loss=2.500e-01
+ relu    c=  1.0: hidden units identical=True input cols equal=True yhat=[0.5, 0.5, 0.5, 0.5] loss=2.500e-01
+ gelu    c=  0.5: hidden units identical=True input cols equal=True yhat=[0.002, 0.999, 0.999, -0.0] loss=1.127e-06
+ gelu    c= -0.3: hidden units identical=True input cols equal=True yhat=[-0.0, 1.0, 1.0, 0.0] loss=3.463e-08
+ gelu    c=  1.0: hidden units identical=True input cols equal=True yhat=[0.003, 0.999, 0.999, -0.0] loss=2.569e-06
+ square  c=  0.5: hidden units identical=True input cols equal=True yhat=[0.0, 1.0, 1.0, 0.0] loss=6.030e-30
+ square  c= -0.3: hidden units identical=True input cols equal=True yhat=[0.0, 1.0, 1.0, 0.0] loss=6.101e-30
+
+== check_lr_saturation.py (run from the repository root, about 3 minutes) ==
+RESULT lr=0.1 epoch=0 saturated_frac=1.000 mean_row_norm_W1=7.1 dev_loss=0.695 dev_acc=0.488
+RESULT lr=0.1 epoch=1 saturated_frac=0.998 mean_row_norm_W1=7.4 dev_loss=0.537 dev_acc=0.738
+RESULT lr=0.02 epoch=0 saturated_frac=0.000 mean_row_norm_W1=2.6 dev_loss=0.505 dev_acc=0.750
+RESULT lr=0.02 epoch=1 saturated_frac=0.006 mean_row_norm_W1=2.9 dev_loss=0.496 dev_acc=0.758

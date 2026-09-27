@@ -1,3 +1,11 @@
+# GenAI disclosure (EN.705.641 syllabus, Green designation):
+# Claude (Anthropic, model claude-opus-5-5) wrote the code under every "# TODO" in this
+# file and added model.train() at the start of each training epoch (evaluate() switches the
+# model to eval mode, so without it dropout would stay off after epoch 0). This fixed-window
+# LM part is not in the Canvas version of Assignment 3. It was completed so the template has
+# no open TODOs and was checked with a forward/backward smoke test only. I directed the work
+# and reviewed it before submitting. LLM-generated code is cited here per the syllabus.
+
 import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import tqdm
@@ -56,6 +64,8 @@ def preprocess_data(data, local_window_size, splitter, tokenizer):
                 # TODO: Select a subset of token_ids from idx -> idx + local_window_size as input and put it to x
                 # Select a subset of token_ids from idx -> idx + local_window_size as input and put it to x: list of context token_ids
                 # Then select the word immediately after this window as output and put it to y: the target next token_id
+                x_data.append(token_ids[idx: idx + local_window_size])  # local_window_size context ids
+                y_data.append(token_ids[idx + local_window_size])  # the next token id
 
 
     # making tensors
@@ -82,16 +92,17 @@ class NPLMFirstBlock(nn.Module):
         # looking up the word embeddings from self.embeddings()
         # And concatenating them
         # Note this is done for a batch of instances.
-
+        embeds = self.embeddings(inputs)  # (batch, window, embed_dim)
+        embeds = embeds.view(-1, self.local_window_size * self.embed_dim)  # (batch, window * embed_dim)
 
         # Transform embeddings with a linear layer and tanh activation
-
+        hidden = torch.tanh(self.linear(embeds))  # (batch, hidden_dim)
 
         # apply layer normalization
-
+        hidden = self.layer_norm(hidden)
 
         # apply dropout
-
+        final_embeds = self.dropout(hidden)
         # your code ends here
 
         return final_embeds
@@ -109,16 +120,16 @@ class NPLMBlock(nn.Module):
     def forward(self, inputs):
         # TODO: implement the forward pass
         # apply linear transformation and tanh activation
-
+        hidden = torch.tanh(self.linear(inputs))  # (batch, hidden_dim)
 
         # add residual connection
-
+        hidden = inputs + hidden
 
         # apply layer normalization
-
+        hidden = self.layer_norm(hidden)
 
         # apply dropout
-
+        final_inputs = self.dropout(hidden)
         # your code ends here
 
         return final_inputs
@@ -133,10 +144,10 @@ class NPLMFinalBlock(nn.Module):
     def forward(self, inputs):
         # TODO: implement the forward pass
         # apply linear transformation
-
+        logits = self.linear(inputs)  # (batch, vocab_size)
 
         # apply log_softmax to get log-probabilities (logits)
-
+        log_probs = F.log_softmax(logits, dim=-1)  # NLLLoss expects log-probabilities
         # your code ends here
 
         return log_probs
@@ -151,7 +162,8 @@ class NPLM(nn.Module):
         self.intermediate_layers = nn.ModuleList()
 
         # TODO: create num_blocks of NPLMBlock as intermediate layers
-
+        for _ in range(num_blocks):
+            self.intermediate_layers.append(NPLMBlock(hidden_dim, dropout_p))
         # your code ends here
 
         self.final_layer = NPLMFinalBlock(vocab_size, hidden_dim)
@@ -159,14 +171,15 @@ class NPLM(nn.Module):
     def forward(self, inputs):
         # TODO: implement the forward pass
         # input layer
-
+        hidden = self.first_layer(inputs)  # (batch, hidden_dim)
 
         # multiple middle layers
         # remember to apply the ReLU activation function after each layer
-
+        for layer in self.intermediate_layers:
+            hidden = F.relu(layer(hidden))
 
         # output layer
-
+        log_probs = self.final_layer(hidden)  # (batch, vocab_size)
         # your code ends here
 
         return log_probs
@@ -200,6 +213,7 @@ def train(model, train_dataloader, dev_dataloader, criterion, optimizer, schedul
         train_losses = []
         train_ppls = []
         print(f"{'-' * 10} Epoch {epoch}: Training {'-' * 10}")
+        model.train()  # evaluate() below switches to eval mode, so switch back each epoch
         for idx, batch in tqdm(enumerate(train_dataloader)):
             inp, target = batch
 
@@ -212,10 +226,12 @@ def train(model, train_dataloader, dev_dataloader, criterion, optimizer, schedul
             # TODO extract perplexity
             # remember the connection between perplexity and cross-entropy loss
             # name the perplexity result as 'ppl'
-
+            ppl = torch.exp(loss)  # perplexity = exp(mean cross-entropy per token)
 
             # backward pass and update gradient
-
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
             train_losses.append(loss.item())
             train_ppls.append(ppl.item())
@@ -258,6 +274,7 @@ def evaluate(model, eval_dataloader, criterion):
     avg_loss = loss / count
     # TODO: compute perplexity
     # name the perplexity result as 'avg_ppl'
+    avg_ppl = np.exp(avg_loss)
 
     return avg_loss, avg_ppl
 

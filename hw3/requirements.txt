@@ -8,3 +8,4 @@ sentence_splitter==1.4
 torch==2.1.0
 tqdm==4.66.1
 transformers==4.37.1
+scipy==1.12.0

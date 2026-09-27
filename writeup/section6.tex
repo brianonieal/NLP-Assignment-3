@@ -1,0 +1,103 @@
+\section{Programming}
+
+\subsection*{6.1.1 and 6.1.2: Reusing Homework 1 and building the MLP}
+The three \texttt{Copy from your HW1} blocks in \texttt{mlp.py} are adapted from my Homework 1 code to this skeleton's contract: \texttt{featurize} averages the GloVe vectors of the in-vocabulary tokens and returns \texttt{None} when there are none, \texttt{create\_tensor\_dataset} drops those reviews and stacks the rest into a float feature tensor and an \texttt{int64} label tensor, and \texttt{accuracy} takes the arg-max over the class dimension. The MLP builds one \texttt{nn.Linear} per consecutive pair in \texttt{[embed\_dim] + hidden\_dims + [num\_classes]}, so an empty \texttt{hidden\_dims} gives the single linear layer of Homework 1, and \texttt{forward} applies the activation after every layer except the last, because \texttt{CrossEntropyLoss} expects raw logits:
+\begin{verbatim}
+layer_dims = [embed_dim] + list(hidden_dims) + [num_classes]
+for in_dim, out_dim in zip(layer_dims[:-1], layer_dims[1:]):
+    self.linears.append(nn.Linear(in_dim, out_dim))
+...
+hidden = inp                                  # (batch_size, embed_dim)
+for linear in self.linears[:-1]:
+    hidden = self.activation(linear(hidden))  # (batch_size, hidden_dims[i])
+logits = self.linears[-1](hidden)             # (batch_size, num_classes)
+\end{verbatim}
+Before training, the layer shapes were checked for all four configurations, \texttt{forward} was checked against a hand-written composition of the same layers, and \texttt{featurize} and \texttt{accuracy} were checked on small inputs.
+
+\textbf{Setup shared by every run in Section 6.} IMDB, shuffled once with seed 42 (the skeleton's \texttt{shuffle()} was unseeded, and seeding it makes the split reproducible). Dev is the first 1{,}000 training reviews, train the next 20{,}000, and test the first 1{,}000 test reviews. Features are the average \texttt{glove-twitter-50} vector of the NLTK tokens of the lower-cased review. Training uses Adam and cross-entropy for 20 epochs, and the checkpoint with the best dev accuracy is scored on the test set. With 1{,}000 dev reviews, the standard error of an accuracy near 77\% is $\sqrt{0.77\cdot0.23/1000}\approx1.3$ points, which is the scale of the epoch-to-epoch wiggles in every plot below.
+
+\subsection*{6.1.3 Train and evaluate MLPs}
+Configurations from \texttt{explore\_mlp\_structures} (sigmoid activation, batch size 64). The template assigns each depth its own learning rate, so depth and step size change together in this experiment.
+
+\begin{center}\small
+\begin{tabular}{lcccc}
+\toprule
+Hidden layers & Learning rate & Best dev accuracy & Min dev loss & Test accuracy\\
+\midrule
+None (linear) & 0.025 & 0.771 & 0.481 & 0.770\\
+512 & 0.02 & 0.779 & 0.472 & 0.767\\
+512 $\to$ 512 & 0.01 & 0.777 & 0.471 & 0.774\\
+512 $\to$ 512 $\to$ 512 & 0.001 & 0.767 & 0.480 & 0.778\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\textwidth}\includegraphics[width=\linewidth]{../hw3/mlp_None_loss.png}\caption{No hidden layer}\end{subfigure}\hfill
+\begin{subfigure}{0.48\textwidth}\includegraphics[width=\linewidth]{../hw3/mlp_512_loss.png}\caption{512}\end{subfigure}\\[4pt]
+\begin{subfigure}{0.48\textwidth}\includegraphics[width=\linewidth]{../hw3/mlp_512-512_loss.png}\caption{512 $\to$ 512}\end{subfigure}\hfill
+\begin{subfigure}{0.48\textwidth}\includegraphics[width=\linewidth]{../hw3/mlp_512-512-512_loss.png}\caption{512 $\to$ 512 $\to$ 512}\end{subfigure}
+\caption{Train and dev loss per epoch for each MLP configuration.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\textwidth}\includegraphics[width=\linewidth]{../hw3/all_mlp_loss.png}\caption{Dev loss}\end{subfigure}\hfill
+\begin{subfigure}{0.48\textwidth}\includegraphics[width=\linewidth]{../hw3/all_mlp_acc.png}\caption{Dev accuracy}\end{subfigure}
+\caption{Dev loss and dev accuracy across MLP configurations.}
+\end{figure}
+
+\textbf{Findings.} In all four configurations the train loss keeps falling while the dev loss drops for a few epochs and then flattens between about 0.47 and 0.49, and the final train and dev losses differ by only 0.01 to 0.03, so the models are limited by their input features more than by overfitting. Deeper is not better here: best dev accuracy is 77.1\%, 77.9\%, 77.7\%, and 76.7\% for zero to three hidden layers, all within about one standard error of each other, and the three-layer network (which the template also trains at the smallest learning rate, 0.001) starts at chance (epoch-0 train loss 0.695, about $\ln 2$) and has the noisiest dev curve. An average of 50-dimensional word vectors discards word order and negation, so a linear classifier already gets most of what the feature holds, and extra layers add parameters to optimize without adding information the classifier can use.
+
+\subsection*{6.1.4 Embrace non-linearity: the activation functions}
+\texttt{SentimentClassifier} takes an \texttt{activation} argument that selects \texttt{nn.Sigmoid}, \texttt{nn.Tanh}, \texttt{nn.ReLU}, \texttt{nn.GELU}, or \texttt{nn.LeakyReLU}, and \texttt{explore\_mlp\_activations} trains one model per activation with everything else fixed (one 512-unit hidden layer, learning rate 0.02, batch size 128, 20 epochs). The Canvas version of the class template does not contain this function, so its fixed hyper-parameters are taken from the upstream JHU CS 601.471/671 hw3 skeleton that this assignment comes from.
+
+\begin{center}\small
+\begin{tabular}{lccccc}
+\toprule
+Activation & Epoch-0 train loss & Best dev accuracy & Min dev loss & Final dev loss & Test accuracy\\
+\midrule
+Sigmoid & 0.695 & 0.784 & 0.471 & 0.498 & 0.771\\
+Tanh & 0.615 & 0.774 & 0.473 & 0.473 & 0.781\\
+ReLU & 0.599 & 0.774 & 0.477 & 0.505 & 0.767\\
+GELU & 0.602 & 0.787 & 0.472 & 0.519 & 0.760\\
+LeakyReLU & 0.570 & 0.778 & 0.464 & 0.464 & 0.774\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\textwidth}\includegraphics[width=\linewidth]{../hw3/all_mlp_activations_loss.png}\caption{Dev loss}\end{subfigure}\hfill
+\begin{subfigure}{0.48\textwidth}\includegraphics[width=\linewidth]{../hw3/all_mlp_activations_acc.png}\caption{Dev accuracy}\end{subfigure}
+\caption{Dev loss and dev accuracy across activation functions (one 512-unit hidden layer).}
+\end{figure}
+
+\textbf{Findings.} All five activations end in the same place, with best dev accuracy between 77.4\% and 78.7\% and minimum dev loss between 0.464 and 0.477, differences that sit inside the noise of a 1{,}000-review dev set. The visible difference is at the start: sigmoid begins at chance (epoch-0 train loss 0.695) while ReLU, GELU, and LeakyReLU begin at 0.57 to 0.60, which fits Sections 3.3 and 3.4 (sigmoid's slope is at most 1/4 and its output is not zero-centered), but with a single hidden layer the handicap does not compound and it is gone within a few epochs. From epoch 5 to epoch 19, each activation's dev loss wanders over a band 0.05 to 0.10 wide (tanh from 0.473 to 0.571) while its train loss moves within a band 0.015 to 0.034 wide, so for this feature set which checkpoint is kept matters more than which activation is used.
+
+\subsection*{6.1.5 Hyper-parameter tuning: learning rate}
+\texttt{explore\_mlp\_learning\_rates} trains the same single 512-unit sigmoid MLP (batch size 64, 20 epochs) at five learning rates: the provided 0.02 plus 0.1, 0.002, 0.0002, and 0.00002, spaced on a log scale from 0.1 down to 0.00002.
+
+\begin{center}\small
+\begin{tabular}{lcccc}
+\toprule
+Learning rate & Best dev accuracy & Min dev loss & Final dev loss & Test accuracy\\
+\midrule
+0.1 & 0.772 & 0.482 & 0.528 & 0.776\\
+0.02 & 0.780 & 0.470 & 0.480 & 0.772\\
+0.002 & 0.769 & 0.479 & 0.482 & 0.779\\
+0.0002 & 0.750 & 0.499 & 0.499 & 0.739\\
+0.00002 & 0.694 & 0.646 & 0.646 & 0.639\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.48\textwidth}\includegraphics[width=\linewidth]{../hw3/all_mlp_lrs_loss.png}\caption{Dev loss}\end{subfigure}\hfill
+\begin{subfigure}{0.48\textwidth}\includegraphics[width=\linewidth]{../hw3/all_mlp_lrs_acc.png}\caption{Dev accuracy}\end{subfigure}
+\caption{Dev loss and dev accuracy across learning rates (one 512-unit sigmoid hidden layer).}
+\end{figure}
+
+\textbf{Findings.} Learning rates from 0.002 to 0.02 work about equally well (best dev accuracy 76.9\% and 78.0\%), and the provided 0.02 gets to a good model fastest. At 0.1 the network sits at chance for the first five epochs (dev loss 0.693, accuracy near 50\%) and stays noisy after it escapes, while at 0.0002 the loss falls smoothly and slowly to a worse end point (dev loss 0.499, 75.0\%) and at 0.00002 it has barely moved (dev loss 0.690 to 0.646, 69.4\%), so the two ends fail in opposite ways, one by overshooting and one by running out of epochs. The chance-level start at 0.1 coincides with sigmoid saturation: in a separate two-epoch check (\texttt{verification/check\_lr\_saturation.py}), 100\% of the hidden sigmoid outputs on the dev set were below 0.01 or above 0.99 after the first epoch at 0.1 (dev accuracy 48.8\%) against 0\% at 0.02 (75.0\%), and at 0.1 accuracy recovered to 73.8\% in the next epoch with 99.8\% still saturated, so the saturated units act like near-binary switches whose small gradients (Section 1.7) slow the start rather than block learning.

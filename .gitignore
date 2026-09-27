@@ -169,3 +169,10 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Assignment 3 additions
+*.pth
+writeup/*.aux
+writeup/*.out
+writeup/*.log
+writeup/pg-*.png
