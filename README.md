@@ -10,6 +10,7 @@ Brian Onieal
 | file | what it is |
 |---|---|
 | `Onieal_HW3.pdf` | written answers to Sections 1 through 6, with the Section 6 plots and findings |
+| `Onieal_HW3.docx` | the same answers as a Word document, since the Canvas assignment page asks for the Word-formatted version |
 | `hw3/mlp.py` | MLP sentiment classifier, all TODOs completed |
 | `hw3/main.py` | entry point, with `explore_mlp_activations` and `explore_mlp_learning_rates` added |
 | `hw3/mlp_lm.py` | fixed-window MLP language model, all TODOs completed (not required by the Canvas version, see below) |
@@ -78,7 +79,7 @@ and activation differences are within noise. Discussion is in Section 6 of the P
 ## GenAI disclosure
 
 Claude (Anthropic, model `claude-opus-5-5`) was used to produce the written answers,
-derivations, and figures in `Onieal_HW3.pdf`, to complete the code in this repository, and to
+derivations, and figures in `Onieal_HW3.pdf` and `Onieal_HW3.docx`, to complete the code in this repository, and to
 run the experiments and generate the plots. The three "Copy from your HW1" blocks in `mlp.py`
 are adapted from my Homework 1 submission. I directed the work and reviewed it before
 submitting. The same disclosure appears at the top of each `.py` file and of the PDF.
